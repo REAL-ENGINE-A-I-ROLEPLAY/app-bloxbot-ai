@@ -44,5 +44,6 @@ describe("builderModes", () => {
     expect(ids).toContain("template-ui-tooling");
     expect(ids).toContain("template-asset-recipe");
     expect(ids).toContain("template-4d-timeline");
+    expect(ids).not.toContain("template-combat-loop");
   });
 });

@@ -7,7 +7,7 @@ import {
   detailedAnalyticsProperties,
   errorAnalyticsProperties,
 } from "@/lib/analytics";
-import { composeBuilderPrompt, type BuilderModeId, type WorkflowStage } from "@/lib/builderModes";
+import { type BuilderModeId, composeBuilderPrompt, type WorkflowStage } from "@/lib/builderModes";
 import { qk } from "@/lib/queryKeys";
 import { splitModelKey } from "@/lib/splitModelKey";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";

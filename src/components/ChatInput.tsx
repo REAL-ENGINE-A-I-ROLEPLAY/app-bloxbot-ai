@@ -8,14 +8,14 @@ import { useSendMessage } from "@/hooks/mutations/useSendMessage";
 import { useAgents } from "@/hooks/useAgents";
 import { useCommands } from "@/hooks/useCommands";
 import { useAllModels, useConnectedProviders } from "@/hooks/useProviders";
+import { useIsBusy } from "@/hooks/useSessionStatuses";
 import {
   BUILDER_MODES,
+  type BuilderModeId,
   getBuilderTemplateById,
   getBuilderTemplates,
-  type BuilderModeId,
   type WorkflowStage,
 } from "@/lib/builderModes";
-import { useIsBusy } from "@/hooks/useSessionStatuses";
 import { splitModelKey } from "@/lib/splitModelKey";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";
 import { useExplorerReference } from "@/providers/ExplorerReferenceProvider";
@@ -272,6 +272,7 @@ function ChatInput() {
 
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [builderEnabled, setBuilderEnabled] = useState(false);
   const [builderModeId, setBuilderModeId] = useState<BuilderModeId>("ui-builder");
   const [workflowStage, setWorkflowStage] = useState<WorkflowStage>("full_pipeline");
   const [templateId, setTemplateId] = useState<string>("");
@@ -531,9 +532,9 @@ function ChatInput() {
         text: trimmed || " ",
         images,
         studioTargetReference,
-        builderModeId,
-        workflowStage,
-        templatePrompt: selectedTemplate?.prompt ?? null,
+        builderModeId: builderEnabled ? builderModeId : undefined,
+        workflowStage: builderEnabled ? workflowStage : undefined,
+        templatePrompt: builderEnabled ? (selectedTemplate?.prompt ?? null) : null,
       })
       .catch(() => undefined);
   }
@@ -608,6 +609,19 @@ function ChatInput() {
   return (
     <div className="shrink-0 border-t bg-card px-4 py-3">
       <div className="relative mb-2 flex items-center gap-1">
+        <button
+          type="button"
+          aria-pressed={builderEnabled}
+          onClick={() => setBuilderEnabled((enabled) => !enabled)}
+          className={`h-6 rounded-md border px-2 text-[10px] font-medium transition-colors ${
+            builderEnabled
+              ? "border-foreground bg-foreground text-background"
+              : "text-muted-foreground hover:bg-accent"
+          }`}
+          title="Toggle builder workflow wrapper"
+        >
+          Builder assist
+        </button>
         <label className="sr-only" htmlFor="builder-mode-select">
           Builder mode
         </label>
@@ -618,6 +632,7 @@ function ChatInput() {
             setBuilderModeId(event.target.value as BuilderModeId);
             setTemplateId("");
           }}
+          disabled={!builderEnabled}
           className="h-6 max-w-36 rounded-md border bg-background px-1.5 text-[10px] text-muted-foreground"
           title="Builder mode"
         >
@@ -634,6 +649,7 @@ function ChatInput() {
           id="workflow-stage-select"
           value={workflowStage}
           onChange={(event) => setWorkflowStage(event.target.value as WorkflowStage)}
+          disabled={!builderEnabled}
           className="h-6 max-w-28 rounded-md border bg-background px-1.5 text-[10px] text-muted-foreground"
           title="Workflow stage"
         >
@@ -650,6 +666,7 @@ function ChatInput() {
           id="builder-template-select"
           value={templateId}
           onChange={(event) => setTemplateId(event.target.value)}
+          disabled={!builderEnabled}
           className="h-6 max-w-44 rounded-md border bg-background px-1.5 text-[10px] text-muted-foreground"
           title="Builder template"
         >

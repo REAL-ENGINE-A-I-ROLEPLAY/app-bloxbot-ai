@@ -7,7 +7,13 @@ export type BuilderModeId =
   | "combat-builder"
   | "economy-builder";
 
-export type WorkflowStage = "full_pipeline" | "plan" | "generate" | "apply" | "verify" | "summarize";
+export type WorkflowStage =
+  | "full_pipeline"
+  | "plan"
+  | "generate"
+  | "apply"
+  | "verify"
+  | "summarize";
 
 export interface BuilderMode {
   id: BuilderModeId;
@@ -175,17 +181,27 @@ function laneLabel(lane: ProductLane): string {
       return "Lane B: Roblox gameplay systems";
     case "lane-c":
       return "Lane C: 3D/livery/timeline content pipeline";
-    default:
+    case "lane-d":
       return "Lane D: Reliability/safety/performance";
+    default: {
+      const exhaustiveCheck: never = lane;
+      return exhaustiveCheck;
+    }
   }
 }
 
 export function getBuilderModeById(id: BuilderModeId): BuilderMode {
-  return BUILDER_MODES.find((mode) => mode.id === id) ?? BUILDER_MODES[0];
+  const mode = BUILDER_MODES.find((candidate) => candidate.id === id);
+  if (!mode) {
+    throw new Error(`Unknown builder mode: ${id}`);
+  }
+  return mode;
 }
 
 export function getBuilderTemplates(modeId: BuilderModeId): BuilderTemplate[] {
-  return BUILDER_TEMPLATES.filter((template) => template.modeId === "all" || template.modeId === modeId);
+  return BUILDER_TEMPLATES.filter(
+    (template) => template.modeId === "all" || template.modeId === modeId,
+  );
 }
 
 export function getBuilderTemplateById(
@@ -230,12 +246,14 @@ export function composeBuilderPrompt(input: {
   templatePrompt?: string | null;
 }): string {
   const userText = input.text.trim();
-  if (!userText) return input.text;
+  if (!userText) return userText;
   const mode = getBuilderModeById(input.modeId);
   const templateBlock = input.templatePrompt?.trim()
     ? `Template focus:\n${input.templatePrompt.trim()}`
     : null;
-  const checks = qualityChecklist(mode).map((item, index) => `${index + 1}. ${item}`).join("\n");
+  const checks = qualityChecklist(mode)
+    .map((item, index) => `${index + 1}. ${item}`)
+    .join("\n");
   return [
     `Builder mode: ${mode.label}`,
     laneLabel(mode.lane),
