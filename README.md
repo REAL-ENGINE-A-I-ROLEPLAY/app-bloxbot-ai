@@ -1,4 +1,4 @@
-# BloxBot
+# A.R.E.R.P.S + BloxBot A.I.
 
 AI-assisted Roblox development. BloxBot is a free, open-source desktop app that connects any AI model to Roblox Studio's official MCP server, so you can build games by describing what you want.
 
