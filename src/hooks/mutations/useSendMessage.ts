@@ -7,6 +7,7 @@ import {
   detailedAnalyticsProperties,
   errorAnalyticsProperties,
 } from "@/lib/analytics";
+import { composeBuilderPrompt, type BuilderModeId, type WorkflowStage } from "@/lib/builderModes";
 import { qk } from "@/lib/queryKeys";
 import { splitModelKey } from "@/lib/splitModelKey";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";
@@ -17,6 +18,9 @@ interface SendMessageInput {
   text: string;
   images?: Array<{ mime: string; url: string; filename?: string }>;
   studioTargetReference?: string | null;
+  builderModeId?: BuilderModeId;
+  workflowStage?: WorkflowStage;
+  templatePrompt?: string | null;
 }
 
 interface SendMessageContext {
@@ -31,10 +35,28 @@ export function useSendMessage(options?: { onError?: (error: Error) => void }) {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, SendMessageInput, SendMessageContext | undefined>({
-    mutationFn: async ({ text, images, studioTargetReference }: SendMessageInput) => {
+    mutationFn: async ({
+      text,
+      images,
+      studioTargetReference,
+      builderModeId,
+      workflowStage,
+      templatePrompt,
+    }: SendMessageInput) => {
       if (!client || !activeSessionId) throw new Error("No client or session");
 
-      const parts: Array<{ type: string; [k: string]: unknown }> = [{ type: "text", text }];
+      const composedText =
+        builderModeId && workflowStage
+          ? composeBuilderPrompt({
+              text,
+              modeId: builderModeId,
+              workflowStage,
+              templatePrompt,
+            })
+          : text;
+      const parts: Array<{ type: string; [k: string]: unknown }> = [
+        { type: "text", text: composedText },
+      ];
       if (images) {
         for (const img of images) {
           parts.push({ type: "file", mime: img.mime, url: img.url, filename: img.filename });

@@ -8,6 +8,13 @@ import { useSendMessage } from "@/hooks/mutations/useSendMessage";
 import { useAgents } from "@/hooks/useAgents";
 import { useCommands } from "@/hooks/useCommands";
 import { useAllModels, useConnectedProviders } from "@/hooks/useProviders";
+import {
+  BUILDER_MODES,
+  getBuilderTemplateById,
+  getBuilderTemplates,
+  type BuilderModeId,
+  type WorkflowStage,
+} from "@/lib/builderModes";
 import { useIsBusy } from "@/hooks/useSessionStatuses";
 import { splitModelKey } from "@/lib/splitModelKey";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";
@@ -28,6 +35,14 @@ interface ImageAttachment {
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024;
 const MAX_ATTACHMENTS = 5;
+const WORKFLOW_STAGE_OPTIONS: Array<{ value: WorkflowStage; label: string }> = [
+  { value: "full_pipeline", label: "Full pipeline" },
+  { value: "plan", label: "Plan" },
+  { value: "generate", label: "Generate" },
+  { value: "apply", label: "Apply" },
+  { value: "verify", label: "Verify" },
+  { value: "summarize", label: "Summarize" },
+];
 
 let attachmentCounter = 0;
 
@@ -257,6 +272,9 @@ function ChatInput() {
 
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
+  const [builderModeId, setBuilderModeId] = useState<BuilderModeId>("ui-builder");
+  const [workflowStage, setWorkflowStage] = useState<WorkflowStage>("full_pipeline");
+  const [templateId, setTemplateId] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [lbSlideDir, setLbSlideDir] = useState<"left" | "right" | null>(null);
@@ -483,6 +501,11 @@ function ChatInput() {
     () => agents.filter((a) => !a.hidden && (a.mode === "primary" || a.mode === "all")),
     [agents],
   );
+  const templates = useMemo(() => getBuilderTemplates(builderModeId), [builderModeId]);
+  const selectedTemplate = useMemo(
+    () => getBuilderTemplateById(builderModeId, templateId || null),
+    [builderModeId, templateId],
+  );
 
   function handleSubmit() {
     const editorText = promptEditorRef.current?.getText() ?? text;
@@ -504,7 +527,14 @@ function ChatInput() {
     setAttachments([]);
     promptEditorRef.current?.clear();
     void sendMessage
-      .mutateAsync({ text: trimmed || " ", images, studioTargetReference })
+      .mutateAsync({
+        text: trimmed || " ",
+        images,
+        studioTargetReference,
+        builderModeId,
+        workflowStage,
+        templatePrompt: selectedTemplate?.prompt ?? null,
+      })
       .catch(() => undefined);
   }
 
@@ -578,6 +608,58 @@ function ChatInput() {
   return (
     <div className="shrink-0 border-t bg-card px-4 py-3">
       <div className="relative mb-2 flex items-center gap-1">
+        <label className="sr-only" htmlFor="builder-mode-select">
+          Builder mode
+        </label>
+        <select
+          id="builder-mode-select"
+          value={builderModeId}
+          onChange={(event) => {
+            setBuilderModeId(event.target.value as BuilderModeId);
+            setTemplateId("");
+          }}
+          className="h-6 max-w-36 rounded-md border bg-background px-1.5 text-[10px] text-muted-foreground"
+          title="Builder mode"
+        >
+          {BUILDER_MODES.map((mode) => (
+            <option key={mode.id} value={mode.id}>
+              {mode.label}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="workflow-stage-select">
+          Workflow stage
+        </label>
+        <select
+          id="workflow-stage-select"
+          value={workflowStage}
+          onChange={(event) => setWorkflowStage(event.target.value as WorkflowStage)}
+          className="h-6 max-w-28 rounded-md border bg-background px-1.5 text-[10px] text-muted-foreground"
+          title="Workflow stage"
+        >
+          {WORKFLOW_STAGE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="builder-template-select">
+          Builder template
+        </label>
+        <select
+          id="builder-template-select"
+          value={templateId}
+          onChange={(event) => setTemplateId(event.target.value)}
+          className="h-6 max-w-44 rounded-md border bg-background px-1.5 text-[10px] text-muted-foreground"
+          title="Builder template"
+        >
+          <option value="">No template</option>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.label}
+            </option>
+          ))}
+        </select>
         <div className="relative" ref={modelPickerRef}>
           <button
             onClick={() => {
