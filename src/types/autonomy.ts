@@ -27,6 +27,7 @@ export const PermissionDecisionRecordSchema = Schema.mutable(
     decision: PermissionDecisionSchema,
     scope: PermissionDecisionScopeSchema,
     sessionID: Schema.NullOr(Schema.String),
+    scopeKey: Schema.NullOr(Schema.String),
     customInstruction: Schema.NullOr(Schema.String),
     createdAt: Schema.Number.pipe(Schema.int()),
   }),

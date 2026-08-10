@@ -18,9 +18,12 @@ export interface ValidationReport {
   checks: ValidationCheck[];
 }
 
-export function createDryRunPreview(steps: TaskStep[]): DryRunPreview {
+export function createDryRunPreview(
+  steps: TaskStep[],
+  options?: { riskyActions?: readonly string[] },
+): DryRunPreview {
   const impactedAreas = steps.map((step) => step.title);
-  const risky = steps.some((step) => step.rollbackPoint || step.checkpoint);
+  const risky = (options?.riskyActions?.length ?? 0) > 0;
   return {
     summary: `${steps.length} planned steps with ${steps.filter((step) => step.checkpoint).length} checkpoints`,
     impactedAreas,

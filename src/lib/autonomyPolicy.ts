@@ -18,6 +18,7 @@ const RISKY_PROMPT_RULES: Array<{ action: RiskAction; pattern: RegExp }> = [
 
 const RISKY_PERMISSION_PATTERN =
   /\b(rm\s+-rf|del\s+\/f|publish|deploy|ownership|license|chmod|sudo|powershell)\b/iu;
+const OWNERSHIP_PERMISSION_PATTERN = /\b(ownership|license|attribution|copyright)\b/iu;
 
 function matchesPattern(input: string, pattern: string): boolean {
   if (pattern === "*" || pattern.trim() === "") return true;
@@ -42,6 +43,11 @@ export function isRiskyPermissionRequest(request: PermissionRequest): boolean {
   return request.patterns.some((pattern) => RISKY_PERMISSION_PATTERN.test(pattern));
 }
 
+export function isOwnershipPermissionRequest(request: PermissionRequest): boolean {
+  if (OWNERSHIP_PERMISSION_PATTERN.test(request.permission)) return true;
+  return request.patterns.some((pattern) => OWNERSHIP_PERMISSION_PATTERN.test(pattern));
+}
+
 export function normalizePermissionPattern(patterns: string[]): string {
   if (patterns.length === 0) return "*";
   return patterns.join(" || ").slice(0, 1_024);
@@ -57,7 +63,7 @@ export function resolvePermissionDecision(
     if (entry.permission !== request.permission) return false;
     if (!matchesPattern(signature, entry.pattern)) return false;
     if (entry.scope === "session") return entry.sessionID === context.sessionID;
-    if (entry.scope === "workplace") return entry.sessionID === context.workspaceScopeKey;
+    if (entry.scope === "workplace") return entry.scopeKey === context.workspaceScopeKey;
     return true;
   });
   if (matches.length === 0) return null;
@@ -75,6 +81,7 @@ export function createPermissionDecisionRecord(input: {
   decision: PermissionDecision;
   scope: PermissionDecisionScope;
   sessionID: string | null;
+  scopeKey?: string | null;
   customInstruction?: string | null;
 }): PermissionDecisionRecord {
   return {
@@ -83,6 +90,7 @@ export function createPermissionDecisionRecord(input: {
     decision: input.decision,
     scope: input.scope,
     sessionID: input.sessionID,
+    scopeKey: input.scopeKey ?? null,
     customInstruction: input.customInstruction ?? null,
     createdAt: Date.now(),
   };
@@ -100,7 +108,8 @@ export function upsertPermissionDecision(
           entry.permission === nextEntry.permission &&
           entry.pattern === nextEntry.pattern &&
           entry.scope === nextEntry.scope &&
-          entry.sessionID === nextEntry.sessionID
+          entry.sessionID === nextEntry.sessionID &&
+          entry.scopeKey === nextEntry.scopeKey
         ),
     ),
   ].slice(0, 250);

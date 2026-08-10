@@ -44,6 +44,7 @@ import { useSessionStatus } from "@/hooks/useSessionStatuses";
 import { useTodos } from "@/hooks/useTodos";
 import {
   createPermissionDecisionRecord,
+  isOwnershipPermissionRequest,
   isRiskyPermissionRequest,
   normalizePermissionPattern,
   resolvePermissionDecision,
@@ -1495,7 +1496,7 @@ const PermissionPrompt = memo(function PermissionPrompt({
           type="button"
           onClick={() =>
             onReply(permission, {
-              reply: scope === "once" ? "reject" : "reject",
+              reply: "reject",
               decision: "deny",
               scope,
             })
@@ -1713,18 +1714,13 @@ function ChatMessages() {
       replyPermission.mutate({ requestID: permission.id, reply: action.reply });
       if (!activeSessionId) return;
       if (action.scope && action.scope !== "once" && action.decision) {
-        const scopeSessionID =
-          action.scope === "session"
-            ? activeSessionId
-            : action.scope === "workplace"
-              ? autonomySettings.workspaceScopeKey
-              : null;
         const entry = createPermissionDecisionRecord({
           permission: permission.permission,
           pattern: normalizePermissionPattern(permission.patterns),
           decision: action.decision,
           scope: action.scope,
-          sessionID: scopeSessionID,
+          sessionID: action.scope === "session" ? activeSessionId : null,
+          scopeKey: action.scope === "workplace" ? autonomySettings.workspaceScopeKey : null,
           customInstruction: action.customInstruction,
         });
         updatePermissionMatrix((current) => upsertPermissionDecision(current, entry));
@@ -1746,7 +1742,9 @@ function ChatMessages() {
       sessionID: activeSessionId,
       workspaceScopeKey: autonomySettings.workspaceScopeKey,
     });
-    if (!match && !autonomySettings.dontAskOwnershipAgain) return;
+    const allowDontAskOverride =
+      autonomySettings.dontAskOwnershipAgain && isOwnershipPermissionRequest(activePermission);
+    if (!match && !allowDontAskOverride) return;
 
     const risky = isRiskyPermissionRequest(activePermission);
     if (risky && autonomySettings.safetyPolicy.gateRiskyActions) return;

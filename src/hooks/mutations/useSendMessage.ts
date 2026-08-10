@@ -58,25 +58,27 @@ export function useSendMessage(options?: { onError?: (error: Error) => void }) {
             })
           : text;
       const riskyActions = detectRiskActions(builderText);
-      const taskPlan = createTaskPlan(builderText, riskyActions);
       const autonomyDirective = buildAutonomyDirective({
         mode: autonomyMode,
         policy: autonomySettings.safetyPolicy,
         riskyActions,
       });
-      const composedText = [
-        builderText,
-        "",
-        "[Autonomy Execution Context]",
-        `Mode: ${autonomyMode}`,
-        autonomyDirective,
-        "Execution checklist:",
-        ...taskPlan.steps.map(
-          (step, index) =>
-            `${index + 1}. ${step.title} (checkpoint=${step.checkpoint ? "yes" : "no"}, rollback=${step.rollbackPoint ? "yes" : "no"})`,
-        ),
-        "Expected outputs: task plan, execution log, validation result, final report.",
-      ].join("\n");
+      const composedText =
+        autonomyMode === "suggest"
+          ? builderText
+          : [
+              builderText,
+              "",
+              "[Autonomy Execution Context]",
+              `Mode: ${autonomyMode}`,
+              autonomyDirective,
+              "Execution checklist:",
+              ...createTaskPlan(builderText, riskyActions).steps.map(
+                (step, index) =>
+                  `${index + 1}. ${step.title} (checkpoint=${step.checkpoint ? "yes" : "no"}, rollback=${step.rollbackPoint ? "yes" : "no"})`,
+              ),
+              "Expected outputs: task plan, execution log, validation result, final report.",
+            ].join("\n");
       const parts: Array<{ type: string; [k: string]: unknown }> = [
         { type: "text", text: composedText },
       ];
