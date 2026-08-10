@@ -13,6 +13,11 @@ import { toast } from "sonner";
 import { useAgents } from "@/hooks/useAgents";
 import { useConnectedProviders } from "@/hooks/useProviders";
 import {
+  type AutonomyMode,
+  type PermissionDecisionRecord,
+  DEFAULT_AUTONOMY_SETTINGS,
+} from "@/types/autonomy";
+import {
   ANALYTICS_NOTICE_VERSION,
   setDetailedAnalyticsEnabled as setDetailedAnalyticsCollection,
 } from "@/lib/analytics";
@@ -20,17 +25,33 @@ import { type AppConfig, loadConfig, patchConfig } from "@/lib/config";
 import { qk } from "@/lib/queryKeys";
 import { splitModelKey } from "@/lib/splitModelKey";
 
+function cloneDefaultAutonomySettings(): AppConfig["autonomy"] {
+  return {
+    ...DEFAULT_AUTONOMY_SETTINGS,
+    safetyPolicy: { ...DEFAULT_AUTONOMY_SETTINGS.safetyPolicy },
+    permissionMatrix: [...DEFAULT_AUTONOMY_SETTINGS.permissionMatrix],
+    monitorSignals: [...DEFAULT_AUTONOMY_SETTINGS.monitorSignals],
+    qualityThresholds: { ...DEFAULT_AUTONOMY_SETTINGS.qualityThresholds },
+  };
+}
+
 interface PreferencesContextValue {
   selectedModel: string | null;
   selectedAgent: string | null;
   selectedVariant: string | null;
   hiddenModels: Set<string>;
   detailedAnalyticsEnabled: boolean;
+  autonomyMode: AutonomyMode;
+  autonomySettings: AppConfig["autonomy"];
   setSelectedModel: (modelID: string) => void;
   setSelectedAgent: (name: string) => void;
   setSelectedVariant: (variant: string | null) => void;
   toggleModelVisibility: (modelKey: string) => void;
   setDetailedAnalyticsEnabled: (enabled: boolean) => void;
+  setAutonomyMode: (mode: AutonomyMode) => void;
+  updatePermissionMatrix: (updater: (current: PermissionDecisionRecord[]) => PermissionDecisionRecord[]) => void;
+  setDontAskOwnershipAgain: (enabled: boolean) => void;
+  setWorkspaceScopeKey: (scopeKey: string) => void;
 }
 
 export const PreferencesContext = createContext<PreferencesContextValue | undefined>(undefined);
@@ -52,7 +73,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [selectedVariant, setSelectedVariantState] = useState<string | null>(null);
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
   const [detailedAnalyticsEnabled, setDetailedAnalyticsEnabledState] = useState(false);
+  const [autonomySettings, setAutonomySettingsState] = useState<AppConfig["autonomy"]>(
+    cloneDefaultAutonomySettings,
+  );
   const detailedAnalyticsEnabledRef = useRef(false);
+  const autonomySettingsRef = useRef<AppConfig["autonomy"]>(cloneDefaultAutonomySettings());
 
   const connectedProviders = useConnectedProviders();
 
@@ -72,6 +97,9 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!configData) return;
     setHiddenModels(new Set(configData.hiddenModels));
+    const loadedAutonomy = configData.autonomy ?? cloneDefaultAutonomySettings();
+    autonomySettingsRef.current = loadedAutonomy;
+    setAutonomySettingsState(loadedAutonomy);
 
     // Model usage metrics moved from opt-in to opt-out. Choices recorded under the
     // old consent prompt (including clickaways) do not carry over: metrics start
@@ -162,6 +190,53 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     [hiddenModels],
   );
 
+  const patchAutonomy = useCallback((next: AppConfig["autonomy"]) => {
+    const previous = autonomySettingsRef.current;
+    autonomySettingsRef.current = next;
+    setAutonomySettingsState(next);
+    patchConfig({ autonomy: next }).catch(() => {
+      autonomySettingsRef.current = previous;
+      setAutonomySettingsState(previous);
+    });
+  }, []);
+
+  const setAutonomyMode = useCallback(
+    (mode: AutonomyMode) => {
+      const previous = autonomySettingsRef.current;
+      const next = { ...previous, mode };
+      patchAutonomy(next);
+    },
+    [patchAutonomy],
+  );
+
+  const updatePermissionMatrix = useCallback(
+    (updater: (current: PermissionDecisionRecord[]) => PermissionDecisionRecord[]) => {
+      const previous = autonomySettingsRef.current;
+      const next = {
+        ...previous,
+        permissionMatrix: updater(previous.permissionMatrix),
+      };
+      patchAutonomy(next);
+    },
+    [patchAutonomy],
+  );
+
+  const setDontAskOwnershipAgain = useCallback(
+    (enabled: boolean) => {
+      const previous = autonomySettingsRef.current;
+      patchAutonomy({ ...previous, dontAskOwnershipAgain: enabled });
+    },
+    [patchAutonomy],
+  );
+
+  const setWorkspaceScopeKey = useCallback(
+    (scopeKey: string) => {
+      const previous = autonomySettingsRef.current;
+      patchAutonomy({ ...previous, workspaceScopeKey: scopeKey });
+    },
+    [patchAutonomy],
+  );
+
   const value = useMemo<PreferencesContextValue>(
     () => ({
       selectedModel,
@@ -169,11 +244,17 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       selectedVariant,
       hiddenModels,
       detailedAnalyticsEnabled,
+      autonomyMode: autonomySettings.mode,
+      autonomySettings,
       setSelectedModel,
       setSelectedAgent,
       setSelectedVariant,
       toggleModelVisibility,
       setDetailedAnalyticsEnabled,
+      setAutonomyMode,
+      updatePermissionMatrix,
+      setDontAskOwnershipAgain,
+      setWorkspaceScopeKey,
     }),
     [
       selectedModel,
@@ -181,11 +262,16 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       selectedVariant,
       hiddenModels,
       detailedAnalyticsEnabled,
+      autonomySettings,
       setSelectedModel,
       setSelectedAgent,
       setSelectedVariant,
       toggleModelVisibility,
       setDetailedAnalyticsEnabled,
+      setAutonomyMode,
+      updatePermissionMatrix,
+      setDontAskOwnershipAgain,
+      setWorkspaceScopeKey,
     ],
   );
 

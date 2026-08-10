@@ -28,6 +28,7 @@ describe("browser desktop fallback", () => {
       analyticsNoticeVersion: 0,
       studioTargetPrograms: null,
       studioTargetsBySession: {},
+      autonomy: expect.any(Object),
     });
   });
 
@@ -46,6 +47,7 @@ describe("browser desktop fallback", () => {
       analyticsNoticeVersion: 0,
       studioTargetPrograms: null,
       studioTargetsBySession: {},
+      autonomy: expect.any(Object),
     });
   });
 
@@ -62,6 +64,7 @@ describe("browser desktop fallback", () => {
       analyticsNoticeVersion: 0,
       studioTargetPrograms: null,
       studioTargetsBySession: {},
+      autonomy: expect.any(Object),
     });
   });
 

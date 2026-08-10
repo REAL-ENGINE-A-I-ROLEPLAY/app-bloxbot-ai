@@ -7,9 +7,11 @@ import {
   detailedAnalyticsProperties,
   errorAnalyticsProperties,
 } from "@/lib/analytics";
+import { buildAutonomyDirective, detectRiskActions } from "@/lib/autonomyPolicy";
 import { type BuilderModeId, composeBuilderPrompt, type WorkflowStage } from "@/lib/builderModes";
 import { qk } from "@/lib/queryKeys";
 import { splitModelKey } from "@/lib/splitModelKey";
+import { createTaskPlan } from "@/lib/taskOrchestrator";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";
 import { useOpenCodeClient } from "@/providers/OpenCodeClientProvider";
 import { usePreferences } from "@/providers/PreferencesProvider";
@@ -31,7 +33,8 @@ interface SendMessageContext {
 export function useSendMessage(options?: { onError?: (error: Error) => void }) {
   const { client } = useOpenCodeClient();
   const { activeSessionId } = useActiveSession();
-  const { selectedModel, selectedAgent, selectedVariant } = usePreferences();
+  const { selectedModel, selectedAgent, selectedVariant, autonomyMode, autonomySettings } =
+    usePreferences();
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, SendMessageInput, SendMessageContext | undefined>({
@@ -45,7 +48,7 @@ export function useSendMessage(options?: { onError?: (error: Error) => void }) {
     }: SendMessageInput) => {
       if (!client || !activeSessionId) throw new Error("No client or session");
 
-      const composedText =
+      const builderText =
         builderModeId && workflowStage
           ? composeBuilderPrompt({
               text,
@@ -54,6 +57,26 @@ export function useSendMessage(options?: { onError?: (error: Error) => void }) {
               templatePrompt,
             })
           : text;
+      const riskyActions = detectRiskActions(builderText);
+      const taskPlan = createTaskPlan(builderText, riskyActions);
+      const autonomyDirective = buildAutonomyDirective({
+        mode: autonomyMode,
+        policy: autonomySettings.safetyPolicy,
+        riskyActions,
+      });
+      const composedText = [
+        builderText,
+        "",
+        "[Autonomy Execution Context]",
+        `Mode: ${autonomyMode}`,
+        autonomyDirective,
+        "Execution checklist:",
+        ...taskPlan.steps.map(
+          (step, index) =>
+            `${index + 1}. ${step.title} (checkpoint=${step.checkpoint ? "yes" : "no"}, rollback=${step.rollbackPoint ? "yes" : "no"})`,
+        ),
+        "Expected outputs: task plan, execution log, validation result, final report.",
+      ].join("\n");
       const parts: Array<{ type: string; [k: string]: unknown }> = [
         { type: "text", text: composedText },
       ];

@@ -42,9 +42,18 @@ import { useActiveQuestion } from "@/hooks/useQuestions";
 import { useSessionError } from "@/hooks/useSessionError";
 import { useSessionStatus } from "@/hooks/useSessionStatuses";
 import { useTodos } from "@/hooks/useTodos";
+import {
+  createPermissionDecisionRecord,
+  isRiskyPermissionRequest,
+  normalizePermissionPattern,
+  resolvePermissionDecision,
+  toPermissionReply,
+  upsertPermissionDecision,
+} from "@/lib/autonomyPolicy";
 import { type ModelError, presentModelError } from "@/lib/modelError";
 import { getOpenCodeUsageAction, type OpenCodeUsageAction } from "@/lib/usageLimit";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";
+import { usePreferences } from "@/providers/PreferencesProvider";
 import type { MessageWithParts } from "@/types";
 
 // ── Image lightbox ───────────────────────────────────────────────────────
@@ -1411,8 +1420,19 @@ const PermissionPrompt = memo(function PermissionPrompt({
   onReply,
 }: {
   permission: PermissionRequest;
-  onReply: (requestID: string, reply: "once" | "always" | "reject") => void;
+  onReply: (
+    permission: PermissionRequest,
+    action: {
+      reply: "once" | "always" | "reject";
+      decision?: "allow" | "deny";
+      scope?: "once" | "session" | "workplace" | "always";
+      dontAskAgain?: boolean;
+      customInstruction?: string;
+    },
+  ) => void;
 }) {
+  const [scope, setScope] = useState<"once" | "session" | "workplace" | "always">("once");
+  const [customInstruction, setCustomInstruction] = useState("");
   return (
     <div className="animate-fade-in-up my-2 rounded-lg border border-amber-200 bg-amber-50/30 px-3 py-3 dark:border-amber-900 dark:bg-amber-950/30">
       <div className="text-[11px] font-semibold text-foreground">Permission Required</div>
@@ -1431,26 +1451,81 @@ const PermissionPrompt = memo(function PermissionPrompt({
         </div>
       )}
       <div className="mt-3 flex items-center gap-2">
+        <select
+          value={scope}
+          onChange={(event) =>
+            setScope(event.target.value as "once" | "session" | "workplace" | "always")
+          }
+          className="h-7 rounded-md border bg-background px-2 text-[11px]"
+          aria-label="Permission scope"
+        >
+          <option value="once">This one time</option>
+          <option value="session">In this session</option>
+          <option value="workplace">In this workplace</option>
+          <option value="always">Always</option>
+        </select>
         <button
           type="button"
-          onClick={() => onReply(permission.id, "once")}
+          onClick={() =>
+            onReply(permission, {
+              reply: scope === "once" ? "once" : "always",
+              decision: "allow",
+              scope,
+            })
+          }
           className="rounded-md bg-foreground px-3 py-1 text-[11px] font-medium text-background transition-opacity hover:opacity-90"
         >
-          Allow Once
+          Allow
         </button>
         <button
           type="button"
-          onClick={() => onReply(permission.id, "always")}
+          onClick={() =>
+            onReply(permission, {
+              reply: "always",
+              decision: "allow",
+              scope: "always",
+              dontAskAgain: true,
+            })
+          }
           className="rounded-md border px-3 py-1 text-[11px] text-foreground transition-colors hover:bg-accent"
         >
-          Always Allow
+          Don't Ask Again
         </button>
         <button
           type="button"
-          onClick={() => onReply(permission.id, "reject")}
+          onClick={() =>
+            onReply(permission, {
+              reply: scope === "once" ? "reject" : "reject",
+              decision: "deny",
+              scope,
+            })
+          }
           className="rounded-md px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-destructive"
         >
-          Deny
+          Decline
+        </button>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="text"
+          value={customInstruction}
+          onChange={(event) => setCustomInstruction(event.target.value)}
+          placeholder="Other instructions..."
+          className="h-7 flex-1 rounded-md border bg-background px-2 text-[11px]"
+        />
+        <button
+          type="button"
+          onClick={() =>
+            onReply(permission, {
+              reply: scope === "once" ? "once" : "always",
+              decision: "allow",
+              scope,
+              customInstruction,
+            })
+          }
+          className="rounded-md border px-2.5 py-1 text-[11px] transition-colors hover:bg-accent"
+        >
+          Other
         </button>
       </div>
     </div>
@@ -1557,6 +1632,7 @@ function ChatMessages() {
   const todos = useTodos();
   const activeQuestion = useActiveQuestion();
   const activePermission = useActivePermission();
+  const { autonomySettings, updatePermissionMatrix, setDontAskOwnershipAgain } = usePreferences();
   const lastMessageHasError =
     lastMessage?.info.role === "assistant" && Boolean(lastMessage.info.error);
   const answerQuestion = useAnswerQuestion();
@@ -1624,10 +1700,67 @@ function ChatMessages() {
     [rejectQuestion],
   );
   const handleReplyPermission = useCallback(
-    (requestID: string, reply: "once" | "always" | "reject") =>
-      replyPermission.mutate({ requestID, reply }),
-    [replyPermission],
+    (
+      permission: PermissionRequest,
+      action: {
+        reply: "once" | "always" | "reject";
+        decision?: "allow" | "deny";
+        scope?: "once" | "session" | "workplace" | "always";
+        dontAskAgain?: boolean;
+        customInstruction?: string;
+      },
+    ) => {
+      replyPermission.mutate({ requestID: permission.id, reply: action.reply });
+      if (!activeSessionId) return;
+      if (action.scope && action.scope !== "once" && action.decision) {
+        const scopeSessionID =
+          action.scope === "session"
+            ? activeSessionId
+            : action.scope === "workplace"
+              ? autonomySettings.workspaceScopeKey
+              : null;
+        const entry = createPermissionDecisionRecord({
+          permission: permission.permission,
+          pattern: normalizePermissionPattern(permission.patterns),
+          decision: action.decision,
+          scope: action.scope,
+          sessionID: scopeSessionID,
+          customInstruction: action.customInstruction,
+        });
+        updatePermissionMatrix((current) => upsertPermissionDecision(current, entry));
+      }
+      if (action.dontAskAgain) setDontAskOwnershipAgain(true);
+    },
+    [
+      activeSessionId,
+      autonomySettings.workspaceScopeKey,
+      replyPermission,
+      setDontAskOwnershipAgain,
+      updatePermissionMatrix,
+    ],
   );
+
+  useEffect(() => {
+    if (!activePermission || !activeSessionId) return;
+    const match = resolvePermissionDecision(autonomySettings.permissionMatrix, activePermission, {
+      sessionID: activeSessionId,
+      workspaceScopeKey: autonomySettings.workspaceScopeKey,
+    });
+    if (!match && !autonomySettings.dontAskOwnershipAgain) return;
+
+    const risky = isRiskyPermissionRequest(activePermission);
+    if (risky && autonomySettings.safetyPolicy.gateRiskyActions) return;
+    const decision = match?.decision ?? "allow";
+    replyPermission.mutate({ requestID: activePermission.id, reply: toPermissionReply(decision) });
+  }, [
+    activePermission,
+    activeSessionId,
+    autonomySettings.dontAskOwnershipAgain,
+    autonomySettings.permissionMatrix,
+    autonomySettings.safetyPolicy.gateRiskyActions,
+    autonomySettings.workspaceScopeKey,
+    replyPermission,
+  ]);
 
   if (messageIds.length === 0 && !isBusy && !sessionError) {
     return (

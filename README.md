@@ -10,6 +10,7 @@ AI-assisted Roblox development. A.R.E.R.P.S + BloxBot A.I. is a free, open-sourc
 - Create scripts, build UI, manipulate the explorer hierarchy, edit properties  - all through natural language
 - Uses Roblox Studio's [built-in MCP server](https://create.roblox.com/docs/studio/mcp), giving the AI structured access to Studio. No plugins to install
 - Bring your own API key from any supported provider, or connect via OAuth
+- Includes a policy-driven automation layer with Suggest, Semi-Auto, and Full Auto modes plus permission memory controls
 
 ## How it works
 
@@ -97,6 +98,15 @@ electron/               # Electron main process and preload bridge
 | `pnpm test` | Run all tests |
 | `pnpm typecheck` | Type-check app, Electron, and release scripts |
 | `pnpm lint` | Lint frontend code (Biome) |
+
+## Autonomous execution policy
+
+Settings now include an **Automation** tab that configures:
+
+- **Autonomy mode ladder**: Suggest → Semi-Auto → Full Auto
+- **Safety gates**: backups, rollback points, validation, and documentation requirements
+- **Permission matrix memory**: one-time, session, workplace, and always allow/deny decisions
+- **Don't ask again** behavior for ownership/license-style prompts (still constrained by risky-action gating)
 
 ## Tech stack
 
