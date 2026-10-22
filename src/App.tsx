@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import { useRef } from "react";
 
 import Chat from "@/components/Chat";
@@ -22,6 +23,7 @@ function AppInner() {
         <Chat />
       </ErrorBoundary>
       <Toaster />
+      <Analytics />
     </main>
   );
 }

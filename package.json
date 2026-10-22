@@ -33,6 +33,7 @@
     "@lexical/utils": "^0.48.0",
     "@modelcontextprotocol/sdk": "1.26.0",
     "@opencode-ai/sdk": "^1.18.4",
+    "@vercel/analytics": "^2.0.1",
     "@shikijs/core": "^4.3.1",
     "@shikijs/engine-javascript": "^4.3.1",
     "@shikijs/langs": "^4.3.1",
