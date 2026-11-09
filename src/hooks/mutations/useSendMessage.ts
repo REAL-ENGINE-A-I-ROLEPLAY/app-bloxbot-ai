@@ -7,8 +7,11 @@ import {
   detailedAnalyticsProperties,
   errorAnalyticsProperties,
 } from "@/lib/analytics";
+import { buildAutonomyDirective, detectRiskActions } from "@/lib/autonomyPolicy";
+import { type BuilderModeId, composeBuilderPrompt, type WorkflowStage } from "@/lib/builderModes";
 import { qk } from "@/lib/queryKeys";
 import { splitModelKey } from "@/lib/splitModelKey";
+import { createTaskPlan } from "@/lib/taskOrchestrator";
 import { useActiveSession } from "@/providers/ActiveSessionProvider";
 import { useOpenCodeClient } from "@/providers/OpenCodeClientProvider";
 import { usePreferences } from "@/providers/PreferencesProvider";
@@ -17,6 +20,9 @@ interface SendMessageInput {
   text: string;
   images?: Array<{ mime: string; url: string; filename?: string }>;
   studioTargetReference?: string | null;
+  builderModeId?: BuilderModeId;
+  workflowStage?: WorkflowStage;
+  templatePrompt?: string | null;
 }
 
 interface SendMessageContext {
@@ -27,14 +33,55 @@ interface SendMessageContext {
 export function useSendMessage(options?: { onError?: (error: Error) => void }) {
   const { client } = useOpenCodeClient();
   const { activeSessionId } = useActiveSession();
-  const { selectedModel, selectedAgent, selectedVariant } = usePreferences();
+  const { selectedModel, selectedAgent, selectedVariant, autonomyMode, autonomySettings } =
+    usePreferences();
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, SendMessageInput, SendMessageContext | undefined>({
-    mutationFn: async ({ text, images, studioTargetReference }: SendMessageInput) => {
+    mutationFn: async ({
+      text,
+      images,
+      studioTargetReference,
+      builderModeId,
+      workflowStage,
+      templatePrompt,
+    }: SendMessageInput) => {
       if (!client || !activeSessionId) throw new Error("No client or session");
 
-      const parts: Array<{ type: string; [k: string]: unknown }> = [{ type: "text", text }];
+      const builderText =
+        builderModeId && workflowStage
+          ? composeBuilderPrompt({
+              text,
+              modeId: builderModeId,
+              workflowStage,
+              templatePrompt,
+            })
+          : text;
+      const riskyActions = detectRiskActions(builderText);
+      const autonomyDirective = buildAutonomyDirective({
+        mode: autonomyMode,
+        policy: autonomySettings.safetyPolicy,
+        riskyActions,
+      });
+      const composedText =
+        autonomyMode === "suggest"
+          ? builderText
+          : [
+              builderText,
+              "",
+              "[Autonomy Execution Context]",
+              `Mode: ${autonomyMode}`,
+              autonomyDirective,
+              "Execution checklist:",
+              ...createTaskPlan(builderText, riskyActions).steps.map(
+                (step, index) =>
+                  `${index + 1}. ${step.title} (checkpoint=${step.checkpoint ? "yes" : "no"}, rollback=${step.rollbackPoint ? "yes" : "no"})`,
+              ),
+              "Expected outputs: task plan, execution log, validation result, final report.",
+            ].join("\n");
+      const parts: Array<{ type: string; [k: string]: unknown }> = [
+        { type: "text", text: composedText },
+      ];
       if (images) {
         for (const img of images) {
           parts.push({ type: "file", mime: img.mime, url: img.url, filename: img.filename });

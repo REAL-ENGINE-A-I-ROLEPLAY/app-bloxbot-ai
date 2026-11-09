@@ -50,11 +50,11 @@ export function useGeneratePlaytestPlan() {
             variant: selectedVariant ?? undefined,
             format: { type: "json_schema", schema: PLAYTEST_PLAN_SCHEMA, retryCount: 2 },
             system:
-              "You create concise, practical Roblox playtest plans from conversation history. Return only the requested structured data. Never call tools and never modify files or Roblox Studio.",
+              "You create concise, practical Roblox playtest plans from conversation history. Build scenario-based suites when relevant, including combat checks, vehicle stress checks, team switching checks, and spawn safety checks. Return only the requested structured data. Never call tools and never modify files or Roblox Studio.",
             parts: [
               {
                 type: "text",
-                text: `Create a focused playtest plan for the work described below. Make each step directly executable and each success criterion observable.\n\nCHAT HISTORY\n${history}`,
+                text: `Create a focused playtest plan for the work described below. Make each step directly executable and each success criterion observable. Include scenario coverage labels in steps where possible.\n\nCHAT HISTORY\n${history}`,
               },
             ],
           },

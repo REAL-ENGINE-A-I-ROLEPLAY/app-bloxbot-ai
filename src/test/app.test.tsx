@@ -491,8 +491,8 @@ describe("User journeys", () => {
       expect(screen.getByText("bash")).toBeInTheDocument();
     });
 
-    // Click "Allow Once"
-    const allowBtn = screen.getByText("Allow Once");
+    // Click "Allow"
+    const allowBtn = screen.getByText("Allow");
     await act(async () => {
       fireEvent.click(allowBtn);
     });

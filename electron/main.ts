@@ -316,7 +316,7 @@ function createWindow(): Effect.Effect<void, DesktopMainError> {
     const window = yield* Effect.try({
       try: () =>
         new BrowserWindow({
-          title: "BloxBot",
+          title: "A.R.E.R.P.S + BloxBot A.I.",
           width: 920,
           height: 600,
           minWidth: 520,
@@ -337,7 +337,7 @@ function createWindow(): Effect.Effect<void, DesktopMainError> {
     yield* Effect.sync(() => {
       mainWindow = window;
       window.webContents.setUserAgent(
-        `${window.webContents.getUserAgent()} BloxBot/${app.getVersion()}`,
+        `${window.webContents.getUserAgent()} A.R.E.R.P.S+BloxBot-A.I./${app.getVersion()}`,
       );
       window.webContents.setWindowOpenHandler(({ url }) => {
         Effect.runFork(
