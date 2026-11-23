@@ -1,5 +1,10 @@
 import { Schema } from "effect";
 import type { ExplorerProgramEnvelope, ExplorerSnapshot } from "../lib/explorer";
+import {
+  type AutonomySettings,
+  AutonomySettingsSchema,
+  DEFAULT_AUTONOMY_SETTINGS,
+} from "./autonomy";
 import type { GeneratedProgramArtifact } from "./generatedProgram";
 import {
   type StudioTargetDiscovery,
@@ -27,6 +32,7 @@ export const AppConfigSchema = Schema.mutable(
     analyticsNoticeVersion: Schema.Number,
     studioTargetPrograms: Schema.NullOr(StudioTargetProgramsSchema),
     studioTargetsBySession: Schema.Record({ key: Schema.String, value: StudioTargetSchema }),
+    autonomy: AutonomySettingsSchema,
   }),
 );
 
@@ -40,6 +46,13 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   analyticsNoticeVersion: 0,
   studioTargetPrograms: null,
   studioTargetsBySession: {},
+  autonomy: {
+    ...DEFAULT_AUTONOMY_SETTINGS,
+    safetyPolicy: { ...DEFAULT_AUTONOMY_SETTINGS.safetyPolicy },
+    permissionMatrix: [...DEFAULT_AUTONOMY_SETTINGS.permissionMatrix],
+    monitorSignals: [...DEFAULT_AUTONOMY_SETTINGS.monitorSignals],
+    qualityThresholds: { ...DEFAULT_AUTONOMY_SETTINGS.qualityThresholds },
+  } satisfies AutonomySettings,
 };
 
 export const AppConfigPatchSchema = Schema.partial(AppConfigSchema);

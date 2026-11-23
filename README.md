@@ -1,6 +1,6 @@
-# BloxBot
+# A.R.E.R.P.S + BloxBot A.I.
 
-AI-assisted Roblox development. BloxBot is a free, open-source desktop app that connects any AI model to Roblox Studio's official MCP server, so you can build games by describing what you want.
+AI-assisted Roblox development. A.R.E.R.P.S + BloxBot A.I. is a free, open-source desktop app that connects any AI model to Roblox Studio's official MCP server, so you can build games by describing what you want.
 
 **[Download the latest release](https://github.com/paralov/app-bloxbot-ai/releases/latest)** | **[Website](https://bloxbot.ai)**
 
@@ -10,6 +10,7 @@ AI-assisted Roblox development. BloxBot is a free, open-source desktop app that 
 - Create scripts, build UI, manipulate the explorer hierarchy, edit properties  - all through natural language
 - Uses Roblox Studio's [built-in MCP server](https://create.roblox.com/docs/studio/mcp), giving the AI structured access to Studio. No plugins to install
 - Bring your own API key from any supported provider, or connect via OAuth
+- Includes a policy-driven automation layer with Suggest, Semi-Auto, and Full Auto modes plus permission memory controls
 
 ## How it works
 
@@ -63,6 +64,30 @@ pnpm install
 pnpm dev
 ```
 
+### Mobile companion + backend (new workspace packages)
+
+This repository now includes a companion-first mobile foundation and hosted backend:
+
+- `mobile/` — Expo (iOS/Android) client for sessions, chat, provider/agent selection, and desktop handoff UX
+- `backend/` — Node/Express service for session APIs and event streaming
+- `packages/contracts/` — shared schema contracts used by mobile and backend
+
+Useful commands:
+
+```sh
+# Desktop app (existing Electron flow)
+pnpm dev:desktop
+
+# Backend service
+pnpm dev:backend
+
+# Mobile companion
+pnpm dev:mobile
+
+# Validate all TypeScript packages
+pnpm typecheck:all
+```
+
 Production builds require `VITE_POSTHOG_PROJECT_TOKEN`. Copy `.env.example` to
 `.env.local` for local packaging. GitHub Actions injects the public project token
 from the `POSTHOG_PROJECT_TOKEN` repository variable when building release artifacts.
@@ -97,6 +122,15 @@ electron/               # Electron main process and preload bridge
 | `pnpm test` | Run all tests |
 | `pnpm typecheck` | Type-check app, Electron, and release scripts |
 | `pnpm lint` | Lint frontend code (Biome) |
+
+## Autonomous execution policy
+
+Settings now include an **Automation** tab that configures:
+
+- **Autonomy mode ladder**: Suggest → Semi-Auto → Full Auto
+- **Safety gates**: backups, rollback points, validation, and documentation requirements
+- **Permission matrix memory**: one-time, session, workplace, and always allow/deny decisions
+- **Don't ask again** behavior for ownership/license-style prompts (still constrained by risky-action gating)
 
 ## Tech stack
 
