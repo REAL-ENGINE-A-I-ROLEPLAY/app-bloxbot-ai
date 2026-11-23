@@ -64,6 +64,30 @@ pnpm install
 pnpm dev
 ```
 
+### Mobile companion + backend (new workspace packages)
+
+This repository now includes a companion-first mobile foundation and hosted backend:
+
+- `mobile/` — Expo (iOS/Android) client for sessions, chat, provider/agent selection, and desktop handoff UX
+- `backend/` — Node/Express service for session APIs and event streaming
+- `packages/contracts/` — shared schema contracts used by mobile and backend
+
+Useful commands:
+
+```sh
+# Desktop app (existing Electron flow)
+pnpm dev:desktop
+
+# Backend service
+pnpm dev:backend
+
+# Mobile companion
+pnpm dev:mobile
+
+# Validate all TypeScript packages
+pnpm typecheck:all
+```
+
 Production builds require `VITE_POSTHOG_PROJECT_TOKEN`. Copy `.env.example` to
 `.env.local` for local packaging. GitHub Actions injects the public project token
 from the `POSTHOG_PROJECT_TOKEN` repository variable when building release artifacts.
